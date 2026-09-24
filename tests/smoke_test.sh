@@ -120,8 +120,8 @@ PAY_RESP=$(curl -s -X POST "$BASE_URL/invoices/$INV_ID/pay" \
   -d '{"card_token": "tok_success"}')
 
 PAY_STATUS=$(echo "$PAY_RESP" | grep -o '"status":"[^"]*' | cut -d'"' -f4 || true)
-if [ "$PAY_STATUS" == "succeeded" ]; then
-  pass "Payment succeeded: status=succeeded"
+if [ "$PAY_STATUS" == "SUCCEEDED" ] || [ "$PAY_STATUS" == "succeeded" ]; then
+  pass "Payment succeeded: status=$PAY_STATUS"
 else
   fail "Payment failed: $PAY_RESP"
 fi

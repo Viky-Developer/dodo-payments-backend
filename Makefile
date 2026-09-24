@@ -4,7 +4,7 @@ MIGRATIONS_DIR ?= internal/db/migrations
 BIN_DIR ?= bin
 PORT ?= 8080
 
-.PHONY: help build run test test-race tidy fmt vet clean migrate-create migrate-up migrate-down migrate-status migrate-reset migrate-version docker-up docker-down
+.PHONY: help build run test test-race test-concurrent test-integration tidy fmt vet clean migrate-create migrate-up migrate-down migrate-status migrate-reset migrate-version docker-up docker-down
 
 help: ## Display list of available targets
 	@echo "Available Makefile commands:"
@@ -22,6 +22,12 @@ test: ## Run all tests
 
 test-race: ## Run all tests with race detector
 	go test -v -race ./...
+
+test-concurrent: ## Run concurrent payment integration test against PostgreSQL
+	TEST_DATABASE_URL="$(DATABASE_URL)" go test -v ./internal/payment/... -run TestConcurrentPayment
+
+test-integration: ## Run all payment integration tests against PostgreSQL
+	TEST_DATABASE_URL="$(DATABASE_URL)" go test -v ./internal/payment/...
 
 tidy: ## Tidy Go module dependencies
 	go mod tidy

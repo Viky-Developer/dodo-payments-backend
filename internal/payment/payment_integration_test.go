@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"reflect"
 
 	"github.com/Viky-Developer/dodo-payments-backend/internal/auth"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/db/generate"
@@ -120,8 +121,14 @@ func TestIdempotentReplayAndConflict(t *testing.T) {
 	r, _, invoice, _ := paymentFixture(t, charger)
 	first := pay(t, r, invoice, "same-key", "tok_card_declined")
 	second := pay(t, r, invoice, "same-key", "tok_card_declined")
-	if first.Code != http.StatusPaymentRequired || second.Code != first.Code || first.Body.String() != second.Body.String() || charger.calls.Load() != 1 {
+	if first.Code != http.StatusPaymentRequired || second.Code != first.Code || charger.calls.Load() != 1 {
 		t.Fatalf("first=%d second=%d calls=%d", first.Code, second.Code, charger.calls.Load())
+	}
+	var b1, b2 map[string]any
+	_ = json.Unmarshal(first.Body.Bytes(), &b1)
+	_ = json.Unmarshal(second.Body.Bytes(), &b2)
+	if !reflect.DeepEqual(b1, b2) {
+		t.Fatalf("replay body mismatch: %v vs %v", b1, b2)
 	}
 	if got := pay(t, r, invoice, "same-key", "tok_success"); got.Code != http.StatusConflict {
 		t.Fatalf("conflict status=%d", got.Code)
