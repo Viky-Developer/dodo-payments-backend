@@ -134,7 +134,7 @@ func (h *Handler) CreateEndpoint(c *gin.Context) {
 	}
 
 	parsedURL, err := url.ParseRequestURI(trimmedURL)
-	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
+	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
 		c.JSON(http.StatusBadRequest, middleware.NewErrorResponse("invalid_url", "url must be a valid http or https URL"))
 		return
 	}

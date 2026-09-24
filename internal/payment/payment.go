@@ -142,7 +142,7 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 			return 0, nil, err
 		}
 		status = http.StatusAccepted
-		resp.Status = "UNKNOWN"
+		resp.Status = string(generate.PaymentStatusEnumUNKNOWN)
 		resp.FailureReason = "ambiguous_transport_error"
 	} else if result.Status == "failed" {
 		_, err = q.MarkPaymentAttemptFailed(ctx, generate.MarkPaymentAttemptFailedParams{ID: c.attempt.ID, FailureCode: pgtype.Text{String: result.FailureCode, Valid: true}, FailureReason: pgtype.Text{String: "payment_declined", Valid: true}})
@@ -150,7 +150,7 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 			return 0, nil, err
 		}
 		status = http.StatusPaymentRequired
-		resp.Status = "FAILED"
+		resp.Status = string(generate.PaymentStatusEnumFAILED)
 		resp.FailureCode = result.FailureCode
 
 		// Queue INVOICE.PAYMENT_FAILED webhook atomically
@@ -158,7 +158,7 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 			"invoice_id":         invoiceID,
 			"payment_attempt_id": attemptID,
 			"failure_code":       result.FailureCode,
-			"status":             "FAILED",
+			"status":             string(generate.PaymentStatusEnumFAILED),
 		})
 		_ = webhook.QueueDeliveries(ctx, q, h.ids, businessID, c.invoice.ID, generate.WebhookEventTypeEnumINVOICEPAYMENTFAILED, payload)
 	} else {
@@ -169,8 +169,8 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 		if _, err = q.MarkInvoicePaid(ctx, generate.MarkInvoicePaidParams{ID: c.invoice.ID, BusinessID: businessID}); err != nil {
 			return 0, nil, err
 		}
-		resp.Status = "SUCCEEDED"
-		resp.InvoiceState = "PAID"
+		resp.Status = string(generate.PaymentStatusEnumSUCCEEDED)
+		resp.InvoiceState = string(generate.InvoiceStateEnumPAID)
 		resp.PSPRef = result.PSPRef
 
 		// Queue INVOICE.PAID webhook atomically
@@ -178,7 +178,7 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 			"invoice_id":         invoiceID,
 			"payment_attempt_id": attemptID,
 			"psp_ref":            result.PSPRef,
-			"status":             "PAID",
+			"status":             string(generate.InvoiceStateEnumPAID),
 		})
 		_ = webhook.QueueDeliveries(ctx, q, h.ids, businessID, c.invoice.ID, generate.WebhookEventTypeEnumINVOICEPAID, payload)
 	}

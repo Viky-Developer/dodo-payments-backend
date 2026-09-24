@@ -49,6 +49,7 @@ func setupRouter(pool *pgxpool.Pool) *gin.Engine {
 
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
+			"message":"dodo-payments backend is up and running.",
 		})
 	})
 

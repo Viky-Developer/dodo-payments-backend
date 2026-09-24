@@ -219,7 +219,7 @@ func TestInvoiceEndpoints(t *testing.T) {
 		if resp.TotalAmountCents != 35000 {
 			t.Errorf("expected total 35000 cents, got %d", resp.TotalAmountCents)
 		}
-		if resp.State != "OPEN" {
+		if resp.State != string(generate.InvoiceStateEnumOPEN) {
 			t.Errorf("expected state OPEN, got %s", resp.State)
 		}
 		if resp.DueDate != "2026-10-15" {
@@ -309,7 +309,7 @@ func TestInvoiceEndpoints(t *testing.T) {
 
 		var resp InvoiceResponse
 		json.Unmarshal(w.Body.Bytes(), &resp)
-		if resp.State != "DRAFT" {
+		if resp.State != string(generate.InvoiceStateEnumDRAFT) {
 			t.Errorf("expected state DRAFT, got %s", resp.State)
 		}
 	})
@@ -343,7 +343,7 @@ func TestInvoiceEndpoints(t *testing.T) {
 
 		var resp InvoiceResponse
 		json.Unmarshal(w.Body.Bytes(), &resp)
-		if resp.State != "VOID" {
+		if resp.State != string(generate.InvoiceStateEnumVOID) {
 			t.Errorf("expected state VOID, got %s", resp.State)
 		}
 
