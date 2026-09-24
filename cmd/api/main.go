@@ -1,5 +1,124 @@
 package main
 
-// cmd/api — Invoice & Payment API
-// Implementation begins in Phase 2 (auth, customers, invoices).
-func main() {}
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/Viky-Developer/dodo-payments-backend/internal/db"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/middleware"
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// setupRouter configures a Gin engine instance with custom middleware and routes.
+func setupRouter(pool *pgxpool.Pool) *gin.Engine {
+	// Initialize Gin without default logger/recovery to use our custom middlewares
+	r := gin.New()
+
+	// Apply custom request tracking, structured logging, and safe panic recovery
+	r.Use(middleware.RequestID())
+	r.Use(middleware.Logger())
+	r.Use(middleware.Recovery())
+
+	// Health check endpoint verifying both API liveness and database connectivity
+	r.GET("/health", func(c *gin.Context) {
+		if pool != nil {
+			if err := pool.Ping(c.Request.Context()); err != nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{
+					"status":   "error",
+					"database": "unreachable",
+				})
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
+	})
+
+	return r
+}
+
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = "postgres://postgres:postgres@localhost:5432/dodo_payments?sslmode=disable"
+	}
+
+	// 1. Establish and test database connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	log.Printf("Connecting to database...")
+	pool, err := db.Connect(ctx, databaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer pool.Close()
+
+	// Explicitly test and verify the database is reachable and working
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	defer pingCancel()
+
+	if err := pool.Ping(pingCtx); err != nil {
+		log.Fatalf("Database ping verification failed: %v", err)
+	}
+
+	log.Printf("Database connection verified and ready")
+
+	// 2. Setup router and HTTP server using ListenAndServe
+	router := setupRouter(pool)
+
+	srv := &http.Server{
+		Addr:         ":" + port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// 3. Start server in a background goroutine and manage graceful shutdown
+	serverErrors := make(chan error, 1)
+	go func() {
+		log.Printf("Starting Invoice & Payment API with ListenAndServe on :%s", port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
+	}()
+
+	// Listen for OS interrupt signals for graceful shutdown
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	select {
+
+	case err := <-serverErrors:
+		log.Fatalf("Server startup failed: %v", err)
+
+	case sig := <-shutdown:
+		log.Printf("Received signal %v, initiating graceful shutdown...", sig)
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+		defer shutdownCancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Graceful shutdown error: %v, forcing close", err)
+			_ = srv.Close()
+		}
+		log.Printf("Server gracefully stopped")
+	}
+}
