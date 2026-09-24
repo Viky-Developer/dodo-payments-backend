@@ -72,7 +72,6 @@ CREATE TABLE invoices (
     customer_id BIGINT NOT NULL,
     total_amount_cents BIGINT NOT NULL,
     currency VARCHAR(3) NOT NULL,
-    state VARCHAR(32) NOT NULL,
     state invoice_state_enum NOT NULL,
     due_date DATE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -81,7 +80,6 @@ CREATE TABLE invoices (
     CONSTRAINT chk_invoices_total_amount_cents CHECK (total_amount_cents >= 0),
     CONSTRAINT chk_invoices_currency CHECK (currency = 'USD'),
     CONSTRAINT chk_invoices_state CHECK (state IN ('DRAFT', 'OPEN', 'PAID', 'VOID', 'UNCOLLECTIBLE'))
-    CONSTRAINT chk_invoices_currency CHECK (currency = 'USD')
 );
 
 CREATE INDEX idx_invoices_business_id ON invoices (business_id);
@@ -105,7 +103,6 @@ CREATE TABLE idempotency_keys (
     business_id BIGINT NOT NULL REFERENCES businesses(id),
     idempotency_key VARCHAR(255) NOT NULL,
     request_hash VARCHAR(64) NOT NULL,
-    status VARCHAR(32) NOT NULL,
     status idempotency_status_enum NOT NULL,
     response_status INTEGER,
     response_body JSONB,
@@ -123,7 +120,6 @@ CREATE TABLE payment_attempts (
     id BIGINT PRIMARY KEY,
     invoice_id BIGINT NOT NULL REFERENCES invoices(id),
     idempotency_key_id BIGINT NOT NULL REFERENCES idempotency_keys(id),
-    status VARCHAR(32) NOT NULL,
     status payment_status_enum NOT NULL,
     psp_request_id BIGINT NOT NULL,
     psp_ref VARCHAR(255),
@@ -136,7 +132,6 @@ CREATE TABLE payment_attempts (
     CONSTRAINT uq_payment_attempts_idempotency_key_id UNIQUE (idempotency_key_id),
     CONSTRAINT uq_payment_attempts_psp_request_id UNIQUE (psp_request_id),
     CONSTRAINT chk_payment_attempts_status CHECK (status IN ('PROCESSING', 'SUCCEEDED', 'FAILED', 'UNKNOWN'))
-    CONSTRAINT uq_payment_attempts_psp_request_id UNIQUE (psp_request_id)
 );
 
 CREATE UNIQUE INDEX uq_payment_attempts_unresolved_invoice ON payment_attempts (invoice_id) WHERE status IN ('PROCESSING', 'UNKNOWN');
@@ -158,10 +153,8 @@ CREATE TABLE webhook_deliveries (
     id BIGINT PRIMARY KEY,
     webhook_endpoint_id BIGINT NOT NULL REFERENCES webhook_endpoints(id),
     invoice_id BIGINT NOT NULL REFERENCES invoices(id),
-    event_type VARCHAR(64) NOT NULL,
     event_type webhook_event_type_enum NOT NULL,
     payload JSONB NOT NULL,
-    status VARCHAR(32) NOT NULL,
     status webhook_delivery_status_enum NOT NULL,
     attempt_count INTEGER NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMPTZ NOT NULL,

@@ -10,8 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Viky-Developer/dodo-payments-backend/internal/auth"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/customer"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/db"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/db/generate"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/idgen"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/invoice"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/middleware"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -43,6 +49,23 @@ func setupRouter(pool *pgxpool.Pool) *gin.Engine {
 		})
 	})
 
+	if pool != nil {
+		queries := generate.New(pool)
+		idGen := idgen.NewSnowflake(1)
+		codec := publicid.New(os.Getenv("ID_CODEC_SECRET"))
+		transactor := invoice.NewPgxTransactor(pool, queries)
+
+		custHandler := customer.NewHandler(queries, idGen, codec)
+		invHandler := invoice.NewHandler(queries, transactor, idGen, codec)
+
+		authGroup := r.Group("")
+		authGroup.Use(auth.Middleware(queries))
+		{
+			custHandler.RegisterRoutes(authGroup)
+			invHandler.RegisterRoutes(authGroup)
+		}
+	}
+
 	return r
 }
 
@@ -70,7 +93,6 @@ func main() {
 
 	// Explicitly test and verify the database is reachable and working
 	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
-
 	defer pingCancel()
 
 	if err := pool.Ping(pingCtx); err != nil {
@@ -79,7 +101,21 @@ func main() {
 
 	log.Printf("Database connection verified and ready")
 
-	// 2. Setup router and HTTP server using ListenAndServe
+	// 2. Bootstrap demo business and API key idempotently
+	queries := generate.New(pool)
+	idGen := idgen.NewSnowflake(1)
+	bootstrapCtx, bootstrapCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer bootstrapCancel()
+
+	bootResult, err := auth.BootstrapDemoData(bootstrapCtx, queries, idGen)
+	if err != nil {
+		log.Fatalf("Failed to bootstrap demo data: %v", err)
+	}
+	if bootResult.FullApiKey != "" {
+		log.Printf("Demo API Key: %s", bootResult.FullApiKey)
+	}
+
+	// 3. Setup router and HTTP server using ListenAndServe
 	router := setupRouter(pool)
 
 	srv := &http.Server{
@@ -90,7 +126,7 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 3. Start server in a background goroutine and manage graceful shutdown
+	// 4. Start server in a background goroutine and manage graceful shutdown
 	serverErrors := make(chan error, 1)
 	go func() {
 		log.Printf("Starting Invoice & Payment API with ListenAndServe on :%s", port)
@@ -104,7 +140,6 @@ func main() {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	select {
-
 	case err := <-serverErrors:
 		log.Fatalf("Server startup failed: %v", err)
 
@@ -112,7 +147,6 @@ func main() {
 		log.Printf("Received signal %v, initiating graceful shutdown...", sig)
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-
 		defer shutdownCancel()
 
 		if err := srv.Shutdown(shutdownCtx); err != nil {

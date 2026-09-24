@@ -1,0 +1,429 @@
+openapi: 3.0.3
+info:
+  title: Dodo Payments - Invoice & Payment Service API
+  description: Backend service handling multi-tenant business isolation, customers, invoices, and payments.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: dp_test_<prefix>_<secret>
+      description: API key scoped to a specific business.
+
+  schemas:
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: unauthorized
+        message:
+          type: string
+          example: Missing Authorization header
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+    Customer:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: cus_01a2b3c4d5
+        name:
+          type: string
+          example: Alice Wonderland
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCustomerRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Alice Wonderland
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          example: alice@example.com
+
+    InvoiceItemInput:
+      type: object
+      required:
+        - description
+        - quantity
+        - unit_amount_cents
+      properties:
+        description:
+          type: string
+          example: Software Consulting
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        unit_amount_cents:
+          type: integer
+          minimum: 0
+          example: 15000
+
+    InvoiceItem:
+      type: object
+      required:
+        - id
+        - invoice_id
+        - description
+        - quantity
+        - unit_amount_cents
+        - line_total_cents
+      properties:
+        id:
+          type: string
+          example: itm_7a8b9c
+        invoice_id:
+          type: string
+          example: inv_9x8y7z
+        description:
+          type: string
+          example: Software Consulting
+        quantity:
+          type: integer
+          example: 2
+        unit_amount_cents:
+          type: integer
+          example: 15000
+        line_total_cents:
+          type: integer
+          example: 30000
+
+    Invoice:
+      type: object
+      required:
+        - id
+        - customer_id
+        - total_amount_cents
+        - currency
+        - state
+        - due_date
+        - items
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: inv_9x8y7z
+        customer_id:
+          type: string
+          example: cus_01a2b3c4d5
+        total_amount_cents:
+          type: integer
+          description: Server-calculated sum of all line item totals in USD cents.
+          example: 35000
+        currency:
+          type: string
+          enum: [USD]
+          example: USD
+        state:
+          type: string
+          enum: [DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE]
+          example: OPEN
+        due_date:
+          type: string
+          format: date
+          example: "2026-10-15"
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceItem'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - customer_id
+        - currency
+        - due_date
+        - items
+      properties:
+        customer_id:
+          type: string
+          example: cus_01a2b3c4d5
+        currency:
+          type: string
+          enum: [USD]
+          example: USD
+        due_date:
+          type: string
+          format: date
+          example: "2026-10-15"
+        state:
+          type: string
+          enum: [DRAFT, OPEN]
+          default: OPEN
+          example: OPEN
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/InvoiceItemInput'
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '503':
+          description: Service unhealthy or database unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  database:
+                    type: string
+                    example: unreachable
+
+  /customers:
+    post:
+      summary: Create a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List customers for authenticated business
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /customers/{id}:
+    get:
+      summary: Get customer by public ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cus_01a2b3c4d5
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices:
+    post:
+      summary: Create an invoice with line items
+      description: Totals are strictly computed on the server. Client supplied totals are not accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: Validation error or cross-tenant customer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List invoices for authenticated business
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invoice'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{id}:
+    get:
+      summary: Get invoice by public ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: inv_9x8y7z
+      responses:
+        '200':
+          description: Invoice found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{id}/void:
+    post:
+      summary: Void an invoice
+      description: Transitions invoice state to VOID. Allowed from DRAFT or OPEN. Reject from PAID or UNCOLLECTIBLE.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: inv_9x8y7z
+      responses:
+        '200':
+          description: Invoice voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invoice not found or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

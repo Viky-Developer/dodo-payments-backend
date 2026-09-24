@@ -53,15 +53,6 @@ func (ns NullIdempotencyStatusEnum) Value() (driver.Value, error) {
 	return string(ns.IdempotencyStatusEnum), nil
 }
 
-func (e IdempotencyStatusEnum) Valid() bool {
-	switch e {
-	case IdempotencyStatusEnumPROCESSING,
-		IdempotencyStatusEnumCOMPLETED:
-		return true
-	}
-	return false
-}
-
 type InvoiceStateEnum string
 
 const (
@@ -105,18 +96,6 @@ func (ns NullInvoiceStateEnum) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.InvoiceStateEnum), nil
-}
-
-func (e InvoiceStateEnum) Valid() bool {
-	switch e {
-	case InvoiceStateEnumDRAFT,
-		InvoiceStateEnumOPEN,
-		InvoiceStateEnumPAID,
-		InvoiceStateEnumVOID,
-		InvoiceStateEnumUNCOLLECTIBLE:
-		return true
-	}
-	return false
 }
 
 type PaymentStatusEnum string
@@ -163,17 +142,6 @@ func (ns NullPaymentStatusEnum) Value() (driver.Value, error) {
 	return string(ns.PaymentStatusEnum), nil
 }
 
-func (e PaymentStatusEnum) Valid() bool {
-	switch e {
-	case PaymentStatusEnumPROCESSING,
-		PaymentStatusEnumSUCCEEDED,
-		PaymentStatusEnumFAILED,
-		PaymentStatusEnumUNKNOWN:
-		return true
-	}
-	return false
-}
-
 type WebhookDeliveryStatusEnum string
 
 const (
@@ -218,17 +186,6 @@ func (ns NullWebhookDeliveryStatusEnum) Value() (driver.Value, error) {
 	return string(ns.WebhookDeliveryStatusEnum), nil
 }
 
-func (e WebhookDeliveryStatusEnum) Valid() bool {
-	switch e {
-	case WebhookDeliveryStatusEnumPENDING,
-		WebhookDeliveryStatusEnumPROCESSING,
-		WebhookDeliveryStatusEnumDELIVERED,
-		WebhookDeliveryStatusEnumEXHAUSTED:
-		return true
-	}
-	return false
-}
-
 type WebhookEventTypeEnum string
 
 const (
@@ -270,16 +227,6 @@ func (ns NullWebhookEventTypeEnum) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.WebhookEventTypeEnum), nil
-}
-
-func (e WebhookEventTypeEnum) Valid() bool {
-	switch e {
-	case WebhookEventTypeEnumINVOICECREATED,
-		WebhookEventTypeEnumINVOICEPAID,
-		WebhookEventTypeEnumINVOICEPAYMENTFAILED:
-		return true
-	}
-	return false
 }
 
 type ApiKey struct {
