@@ -20,6 +20,7 @@ import (
 	"github.com/Viky-Developer/dodo-payments-backend/internal/payment"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/psp"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/webhook"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -70,6 +71,7 @@ func setupRouter(pool *pgxpool.Pool) *gin.Engine {
 			}
 		}
 		payHandler := payment.NewHandler(pool, idGen, codec, psp.NewClient(pspBaseURL, pspTimeout))
+		webhookHandler := webhook.NewHandler(queries, idGen, codec)
 
 		authGroup := r.Group("")
 		authGroup.Use(auth.Middleware(queries))
@@ -77,6 +79,7 @@ func setupRouter(pool *pgxpool.Pool) *gin.Engine {
 			custHandler.RegisterRoutes(authGroup)
 			invHandler.RegisterRoutes(authGroup)
 			payHandler.RegisterRoutes(authGroup)
+			webhookHandler.RegisterRoutes(authGroup)
 		}
 	}
 
@@ -131,6 +134,12 @@ func main() {
 
 	// 3. Setup router and HTTP server using ListenAndServe
 	router := setupRouter(pool)
+
+	// Start background webhook delivery worker
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	defer cancelWorker()
+	webhookWorker := webhook.NewWorker(pool, queries, 1*time.Second, 30*time.Second, 10, nil)
+	go webhookWorker.Start(workerCtx)
 
 	srv := &http.Server{
 		Addr:         ":" + port,

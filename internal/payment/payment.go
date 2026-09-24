@@ -16,6 +16,7 @@ import (
 	"github.com/Viky-Developer/dodo-payments-backend/internal/middleware"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/psp"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/webhook"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -151,6 +152,15 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 		status = http.StatusPaymentRequired
 		resp.Status = "FAILED"
 		resp.FailureCode = result.FailureCode
+
+		// Queue INVOICE.PAYMENT_FAILED webhook atomically
+		payload, _ := webhook.BuildPayload(generate.WebhookEventTypeEnumINVOICEPAYMENTFAILED, map[string]any{
+			"invoice_id":         invoiceID,
+			"payment_attempt_id": attemptID,
+			"failure_code":       result.FailureCode,
+			"status":             "FAILED",
+		})
+		_ = webhook.QueueDeliveries(ctx, q, h.ids, businessID, c.invoice.ID, generate.WebhookEventTypeEnumINVOICEPAYMENTFAILED, payload)
 	} else {
 		_, err = q.MarkPaymentAttemptSucceeded(ctx, generate.MarkPaymentAttemptSucceededParams{ID: c.attempt.ID, PspRef: pgtype.Text{String: result.PSPRef, Valid: true}})
 		if err != nil {
@@ -162,6 +172,15 @@ func (h *Handler) finalize(ctx context.Context, c claim, result psp.ChargeResult
 		resp.Status = "SUCCEEDED"
 		resp.InvoiceState = "PAID"
 		resp.PSPRef = result.PSPRef
+
+		// Queue INVOICE.PAID webhook atomically
+		payload, _ := webhook.BuildPayload(generate.WebhookEventTypeEnumINVOICEPAID, map[string]any{
+			"invoice_id":         invoiceID,
+			"payment_attempt_id": attemptID,
+			"psp_ref":            result.PSPRef,
+			"status":             "PAID",
+		})
+		_ = webhook.QueueDeliveries(ctx, q, h.ids, businessID, c.invoice.ID, generate.WebhookEventTypeEnumINVOICEPAID, payload)
 	}
 	body, err := json.Marshal(resp)
 	if err != nil {

@@ -234,6 +234,39 @@ components:
         failure_reason:
           type: string
 
+    CreateWebhookEndpointRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          example: https://example.com/webhooks
+
+    WebhookEndpoint:
+      type: object
+      required: [id, url, secret, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          example: whe_7xY8z
+        url:
+          type: string
+          format: uri
+          example: https://example.com/webhooks
+        secret:
+          type: string
+          example: whsec_0123456789abcdef0123456789abcdef
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
 security:
   - BearerAuth: []
 
@@ -492,6 +525,81 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Invoice not found or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /webhook-endpoints:
+    post:
+      summary: Register a webhook endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookEndpointRequest'
+      responses:
+        '201':
+          description: Webhook endpoint registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        '400':
+          description: Invalid request or URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      summary: List registered webhook endpoints for authenticated business
+      responses:
+        '200':
+          description: List of webhook endpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookEndpoint'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /webhook-endpoints/{id}:
+    get:
+      summary: Get webhook endpoint by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: whe_7xY8z
+      responses:
+        '200':
+          description: Webhook endpoint found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+        '404':
+          description: Webhook endpoint not found or unauthorized
           content:
             application/json:
               schema:
