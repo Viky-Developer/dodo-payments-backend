@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Viky-Developer/dodo-payments-backend/internal/auth"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/db/generate"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/idgen"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/psp"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
@@ -109,7 +110,7 @@ func TestConcurrentPaymentChargesOnce(t *testing.T) {
 	if err := pool.QueryRow(context.Background(), `SELECT state FROM invoices ORDER BY created_at DESC LIMIT 1`).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
-	if state != "PAID" {
+	if state != string(generate.InvoiceStateEnumPAID) {
 		t.Fatalf("state=%s", state)
 	}
 }

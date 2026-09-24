@@ -291,12 +291,9 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 	// 5. Initial state validation
 	initialState := generate.InvoiceStateEnumOPEN
 	if req.State != nil {
-		s := strings.ToUpper(strings.TrimSpace(*req.State))
-		switch s {
-		case "DRAFT":
-			initialState = generate.InvoiceStateEnumDRAFT
-		case "OPEN":
-			initialState = generate.InvoiceStateEnumOPEN
+		switch state := generate.InvoiceStateEnum(strings.ToUpper(strings.TrimSpace(*req.State))); state {
+		case generate.InvoiceStateEnumDRAFT, generate.InvoiceStateEnumOPEN:
+			initialState = state
 		default:
 			c.JSON(http.StatusBadRequest, middleware.NewErrorResponse("bad_request", "Initial invoice state must be DRAFT or OPEN"))
 			return
