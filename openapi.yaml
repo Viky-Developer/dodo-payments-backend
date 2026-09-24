@@ -203,6 +203,37 @@ components:
           items:
             $ref: '#/components/schemas/InvoiceItemInput'
 
+    PayInvoiceRequest:
+      type: object
+      required: [card_token]
+      properties:
+        card_token:
+          type: string
+          enum: [tok_success, tok_insufficient_funds, tok_card_declined, tok_timeout, tok_network_error]
+
+    PaymentResult:
+      type: object
+      required: [payment_attempt_id, invoice_id, status, invoice_state]
+      properties:
+        payment_attempt_id:
+          type: string
+          example: att_8Hq2x
+        invoice_id:
+          type: string
+          example: inv_9x8y7z
+        status:
+          type: string
+          enum: [SUCCEEDED, FAILED, UNKNOWN]
+        invoice_state:
+          type: string
+          enum: [OPEN, PAID]
+        psp_ref:
+          type: string
+        failure_code:
+          type: string
+        failure_reason:
+          type: string
+
 security:
   - BearerAuth: []
 
@@ -411,6 +442,50 @@ paths:
                 $ref: '#/components/schemas/Invoice'
         '400':
           description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /invoices/{id}/pay:
+    post:
+      summary: Pay an open invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 255 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayInvoiceRequest'
+      responses:
+        '200':
+          description: Payment succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '202':
+          description: PSP outcome is unknown
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '402':
+          description: Payment was definitively declined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        '409':
+          description: Idempotency conflict, payment in progress, or invoice not payable
           content:
             application/json:
               schema:

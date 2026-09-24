@@ -38,6 +38,11 @@ services:
       PORT: "8081"
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -61,7 +66,7 @@ services:
       migrate:
         condition: service_completed_successfully
       mockpsp:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
       interval: 5s

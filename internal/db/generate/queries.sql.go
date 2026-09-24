@@ -13,8 +13,7 @@ import (
 
 const createApiKey = `-- name: CreateApiKey :one
 INSERT INTO api_keys (id, business_id, key_prefix, secret_hash, created_at, revoked_at)
-VALUES ($1, $2, $3, $4, NOW(), NULL)
-RETURNING id, business_id, key_prefix, secret_hash, created_at, revoked_at
+VALUES ($1, $2, $3, $4, NOW(), NULL) RETURNING id, business_id, key_prefix, secret_hash, created_at, revoked_at
 `
 
 type CreateApiKeyParams struct {
@@ -45,8 +44,7 @@ func (q *Queries) CreateApiKey(ctx context.Context, arg CreateApiKeyParams) (Api
 
 const createBusiness = `-- name: CreateBusiness :one
 INSERT INTO businesses (id, name, created_at, updated_at)
-VALUES ($1, $2, NOW(), NOW())
-RETURNING id, name, created_at, updated_at
+VALUES ($1, $2, NOW(), NOW()) RETURNING id, name, created_at, updated_at
 `
 
 type CreateBusinessParams struct {
@@ -68,8 +66,7 @@ func (q *Queries) CreateBusiness(ctx context.Context, arg CreateBusinessParams) 
 
 const createCustomer = `-- name: CreateCustomer :one
 INSERT INTO customers (id, business_id, name, email, created_at, updated_at)
-VALUES ($1, $2, $3, $4, NOW(), NOW())
-RETURNING id, business_id, name, email, created_at, updated_at
+VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, business_id, name, email, created_at, updated_at
 `
 
 type CreateCustomerParams struct {
@@ -79,7 +76,6 @@ type CreateCustomerParams struct {
 	Email      string `json:"email"`
 }
 
-// Customers
 func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error) {
 	row := q.db.QueryRow(ctx, createCustomer,
 		arg.ID,
@@ -101,8 +97,7 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 
 const createInvoice = `-- name: CreateInvoice :one
 INSERT INTO invoices (id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-RETURNING id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
 `
 
 type CreateInvoiceParams struct {
@@ -115,7 +110,6 @@ type CreateInvoiceParams struct {
 	DueDate          pgtype.Date      `json:"due_date"`
 }
 
-// Invoices
 func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (Invoice, error) {
 	row := q.db.QueryRow(ctx, createInvoice,
 		arg.ID,
@@ -143,8 +137,7 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 
 const createInvoiceItem = `-- name: CreateInvoiceItem :one
 INSERT INTO invoice_items (id, invoice_id, description, quantity, unit_amount_cents, created_at)
-VALUES ($1, $2, $3, $4, $5, NOW())
-RETURNING id, invoice_id, description, quantity, unit_amount_cents, created_at
+VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id, invoice_id, description, quantity, unit_amount_cents, created_at
 `
 
 type CreateInvoiceItemParams struct {
@@ -155,7 +148,6 @@ type CreateInvoiceItemParams struct {
 	UnitAmountCents int64  `json:"unit_amount_cents"`
 }
 
-// Invoice Items
 func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemParams) (InvoiceItem, error) {
 	row := q.db.QueryRow(ctx, createInvoiceItem,
 		arg.ID,
@@ -177,12 +169,9 @@ func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemPa
 }
 
 const getApiKeyByPrefix = `-- name: GetApiKeyByPrefix :one
-SELECT id, business_id, key_prefix, secret_hash, created_at, revoked_at
-FROM api_keys
-WHERE key_prefix = $1
+SELECT id, business_id, key_prefix, secret_hash, created_at, revoked_at FROM api_keys WHERE key_prefix = $1
 `
 
-// API Keys
 func (q *Queries) GetApiKeyByPrefix(ctx context.Context, keyPrefix string) (ApiKey, error) {
 	row := q.db.QueryRow(ctx, getApiKeyByPrefix, keyPrefix)
 	var i ApiKey
@@ -198,12 +187,9 @@ func (q *Queries) GetApiKeyByPrefix(ctx context.Context, keyPrefix string) (ApiK
 }
 
 const getBusinessByID = `-- name: GetBusinessByID :one
-SELECT id, name, created_at, updated_at
-FROM businesses
-WHERE id = $1
+SELECT id, name, created_at, updated_at FROM businesses WHERE id = $1
 `
 
-// Businesses
 func (q *Queries) GetBusinessByID(ctx context.Context, id int64) (Business, error) {
 	row := q.db.QueryRow(ctx, getBusinessByID, id)
 	var i Business
@@ -217,9 +203,7 @@ func (q *Queries) GetBusinessByID(ctx context.Context, id int64) (Business, erro
 }
 
 const getBusinessByName = `-- name: GetBusinessByName :one
-SELECT id, name, created_at, updated_at
-FROM businesses
-WHERE name = $1
+SELECT id, name, created_at, updated_at FROM businesses WHERE name = $1
 `
 
 func (q *Queries) GetBusinessByName(ctx context.Context, name string) (Business, error) {
@@ -235,9 +219,7 @@ func (q *Queries) GetBusinessByName(ctx context.Context, name string) (Business,
 }
 
 const getCustomerByID = `-- name: GetCustomerByID :one
-SELECT id, business_id, name, email, created_at, updated_at
-FROM customers
-WHERE id = $1 AND business_id = $2
+SELECT id, business_id, name, email, created_at, updated_at FROM customers WHERE id = $1 AND business_id = $2
 `
 
 type GetCustomerByIDParams struct {
@@ -260,9 +242,7 @@ func (q *Queries) GetCustomerByID(ctx context.Context, arg GetCustomerByIDParams
 }
 
 const getInvoiceByID = `-- name: GetInvoiceByID :one
-SELECT id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
-FROM invoices
-WHERE id = $1 AND business_id = $2
+SELECT id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at FROM invoices WHERE id = $1 AND business_id = $2
 `
 
 type GetInvoiceByIDParams struct {
@@ -288,10 +268,7 @@ func (q *Queries) GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) 
 }
 
 const listApiKeysByBusinessID = `-- name: ListApiKeysByBusinessID :many
-SELECT id, business_id, key_prefix, secret_hash, created_at, revoked_at
-FROM api_keys
-WHERE business_id = $1
-ORDER BY created_at DESC
+SELECT id, business_id, key_prefix, secret_hash, created_at, revoked_at FROM api_keys WHERE business_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListApiKeysByBusinessID(ctx context.Context, businessID int64) ([]ApiKey, error) {
@@ -322,10 +299,7 @@ func (q *Queries) ListApiKeysByBusinessID(ctx context.Context, businessID int64)
 }
 
 const listCustomersByBusinessID = `-- name: ListCustomersByBusinessID :many
-SELECT id, business_id, name, email, created_at, updated_at
-FROM customers
-WHERE business_id = $1
-ORDER BY created_at DESC
+SELECT id, business_id, name, email, created_at, updated_at FROM customers WHERE business_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListCustomersByBusinessID(ctx context.Context, businessID int64) ([]Customer, error) {
@@ -356,10 +330,7 @@ func (q *Queries) ListCustomersByBusinessID(ctx context.Context, businessID int6
 }
 
 const listInvoiceItemsByInvoiceID = `-- name: ListInvoiceItemsByInvoiceID :many
-SELECT id, invoice_id, description, quantity, unit_amount_cents, created_at
-FROM invoice_items
-WHERE invoice_id = $1
-ORDER BY id ASC
+SELECT id, invoice_id, description, quantity, unit_amount_cents, created_at FROM invoice_items WHERE invoice_id = $1 ORDER BY id ASC
 `
 
 func (q *Queries) ListInvoiceItemsByInvoiceID(ctx context.Context, invoiceID int64) ([]InvoiceItem, error) {
@@ -390,10 +361,7 @@ func (q *Queries) ListInvoiceItemsByInvoiceID(ctx context.Context, invoiceID int
 }
 
 const listInvoiceItemsByInvoiceIDs = `-- name: ListInvoiceItemsByInvoiceIDs :many
-SELECT id, invoice_id, description, quantity, unit_amount_cents, created_at
-FROM invoice_items
-WHERE invoice_id = ANY($1::bigint[])
-ORDER BY id ASC
+SELECT id, invoice_id, description, quantity, unit_amount_cents, created_at FROM invoice_items WHERE invoice_id = ANY($1::bigint[]) ORDER BY id ASC
 `
 
 func (q *Queries) ListInvoiceItemsByInvoiceIDs(ctx context.Context, dollar_1 []int64) ([]InvoiceItem, error) {
@@ -424,10 +392,7 @@ func (q *Queries) ListInvoiceItemsByInvoiceIDs(ctx context.Context, dollar_1 []i
 }
 
 const listInvoicesByBusinessID = `-- name: ListInvoicesByBusinessID :many
-SELECT id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
-FROM invoices
-WHERE business_id = $1
-ORDER BY created_at DESC
+SELECT id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at FROM invoices WHERE business_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListInvoicesByBusinessID(ctx context.Context, businessID int64) ([]Invoice, error) {
@@ -461,10 +426,8 @@ func (q *Queries) ListInvoicesByBusinessID(ctx context.Context, businessID int64
 }
 
 const updateInvoiceState = `-- name: UpdateInvoiceState :one
-UPDATE invoices
-SET state = $3, updated_at = NOW()
-WHERE id = $1 AND business_id = $2
-RETURNING id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
+UPDATE invoices SET state = $3, updated_at = NOW()
+WHERE id = $1 AND business_id = $2 RETURNING id, business_id, customer_id, total_amount_cents, currency, state, due_date, created_at, updated_at
 `
 
 type UpdateInvoiceStateParams struct {
