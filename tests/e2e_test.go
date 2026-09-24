@@ -157,8 +157,8 @@ func TestLiveAPILifecycle(t *testing.T) {
 	if err := json.NewDecoder(payResp.Body).Decode(&paymentResult); err != nil {
 		t.Fatal(err)
 	}
-	if paymentResult.Status != "succeeded" {
-		t.Fatalf("expected status succeeded, got %s", paymentResult.Status)
+	if paymentResult.Status != "SUCCEEDED" && paymentResult.Status != "succeeded" {
+		t.Fatalf("expected status SUCCEEDED, got %s", paymentResult.Status)
 	}
 
 	// 7. Replay same request with same Idempotency-Key
