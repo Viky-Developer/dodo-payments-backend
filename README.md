@@ -407,4 +407,4 @@ TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/dodo_payments?ssl
 
 ## 7. Demo Video
 
-- **Video Link**: [Dodo Payments Backend Demo Video](https://loom.com/placeholder-demo-video-link)
+- **Video Link**: [Dodo Payments Backend Demo Video](https://www.loom.com/share/65bbb9dd9e4c4b95853d49d86a8302b5)
