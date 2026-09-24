@@ -17,6 +17,8 @@ import (
 	"github.com/Viky-Developer/dodo-payments-backend/internal/idgen"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/invoice"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/middleware"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/payment"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/psp"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,12 +59,24 @@ func setupRouter(pool *pgxpool.Pool) *gin.Engine {
 
 		custHandler := customer.NewHandler(queries, idGen, codec)
 		invHandler := invoice.NewHandler(queries, transactor, idGen, codec)
+		pspBaseURL := os.Getenv("PSP_BASE_URL")
+		if pspBaseURL == "" {
+			pspBaseURL = "http://localhost:8081"
+		}
+		pspTimeout := 3 * time.Second
+		if configured := os.Getenv("PSP_TIMEOUT"); configured != "" {
+			if parsed, err := time.ParseDuration(configured); err == nil && parsed > 0 {
+				pspTimeout = parsed
+			}
+		}
+		payHandler := payment.NewHandler(pool, idGen, codec, psp.NewClient(pspBaseURL, pspTimeout))
 
 		authGroup := r.Group("")
 		authGroup.Use(auth.Middleware(queries))
 		{
 			custHandler.RegisterRoutes(authGroup)
 			invHandler.RegisterRoutes(authGroup)
+			payHandler.RegisterRoutes(authGroup)
 		}
 	}
 

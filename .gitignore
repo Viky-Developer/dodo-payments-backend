@@ -31,3 +31,7 @@ go.work.sum
 # .idea/
 # .vscode/
 *bin
+
+# Build and local tooling artifacts
+tmp/
+.air.toml
