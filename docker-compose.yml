@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: dodo_payments
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dodo_payments"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/goose"]
+    command:
+      - -dir
+      - /app/migrations
+      - postgres
+      - postgres://postgres:postgres@postgres:5432/dodo_payments?sslmode=disable
+      - up
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  mockpsp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/mockpsp"]
+    environment:
+      PORT: "8081"
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/dodo_payments?sslmode=disable
+      PSP_BASE_URL: http://mockpsp:8081
+      PSP_TIMEOUT: 3s
+      ID_CODEC_SECRET: dodo-local-id-codec-secret-change-me
+      DEMO_BUSINESS_NAME: Dodo Demo Business
+      DEMO_API_KEY_PREFIX: dp_test_demo
+      DEMO_API_KEY_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mockpsp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  postgres_data:
