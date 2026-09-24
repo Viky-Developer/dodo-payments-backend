@@ -20,9 +20,11 @@ import (
 )
 
 type mockInvoiceQuerier struct {
-	customers map[int64]generate.Customer
-	invoices  map[int64]generate.Invoice
-	items     map[int64][]generate.InvoiceItem
+	customers  map[int64]generate.Customer
+	invoices   map[int64]generate.Invoice
+	items      map[int64][]generate.InvoiceItem
+	endpoints  []generate.WebhookEndpoint
+	deliveries []generate.WebhookDelivery
 }
 
 func newMockInvoiceQuerier() *mockInvoiceQuerier {
@@ -109,6 +111,22 @@ func (m *mockInvoiceQuerier) ListInvoiceItemsByInvoiceIDs(ctx context.Context, i
 		list = append(list, m.items[id]...)
 	}
 	return list, nil
+}
+
+func (m *mockInvoiceQuerier) ListActiveWebhookEndpointsByBusinessID(ctx context.Context, businessID int64) ([]generate.WebhookEndpoint, error) {
+	return m.endpoints, nil
+}
+
+func (m *mockInvoiceQuerier) CreateWebhookDelivery(ctx context.Context, arg generate.CreateWebhookDeliveryParams) (generate.WebhookDelivery, error) {
+	d := generate.WebhookDelivery{
+		ID:                arg.ID,
+		WebhookEndpointID: arg.WebhookEndpointID,
+		InvoiceID:         arg.InvoiceID,
+		EventType:         arg.EventType,
+		Payload:           arg.Payload,
+	}
+	m.deliveries = append(m.deliveries, d)
+	return d, nil
 }
 
 type mockTransactor struct {
@@ -364,6 +382,38 @@ func TestInvoiceEndpoints(t *testing.T) {
 		json.Unmarshal(w.Body.Bytes(), &errResp)
 		if errResp.Error.Code != "invalid_state_transition" {
 			t.Errorf("expected invalid_state_transition, got %s", errResp.Error.Code)
+		}
+	})
+
+	t.Run("create invoice queues webhook delivery", func(t *testing.T) {
+		q.endpoints = []generate.WebhookEndpoint{
+			{ID: 888, BusinessID: biz1, Url: "https://example.com/hook", IsActive: true},
+		}
+		q.deliveries = nil
+
+		reqPayload := CreateInvoiceRequest{
+			CustomerID: custPubID1,
+			Currency:   "USD",
+			DueDate:    "2026-10-15",
+			Items: []ItemInput{
+				{Description: "Subscription", Quantity: 1, UnitAmountCents: 5000},
+			},
+		}
+		body, _ := json.Marshal(reqPayload)
+		req := httptest.NewRequest(http.MethodPost, "/invoices", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		routerBiz1.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		if len(q.deliveries) != 1 {
+			t.Fatalf("expected 1 webhook delivery queued, got %d", len(q.deliveries))
+		}
+		if q.deliveries[0].EventType != generate.WebhookEventTypeEnumINVOICECREATED {
+			t.Fatalf("expected INVOICE.CREATED event, got %s", q.deliveries[0].EventType)
 		}
 	})
 }

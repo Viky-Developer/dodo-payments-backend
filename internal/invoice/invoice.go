@@ -14,6 +14,7 @@ import (
 	"github.com/Viky-Developer/dodo-payments-backend/internal/db/generate"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/middleware"
 	"github.com/Viky-Developer/dodo-payments-backend/internal/publicid"
+	"github.com/Viky-Developer/dodo-payments-backend/internal/webhook"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -30,6 +31,8 @@ type Querier interface {
 	CreateInvoiceItem(ctx context.Context, arg generate.CreateInvoiceItemParams) (generate.InvoiceItem, error)
 	ListInvoiceItemsByInvoiceID(ctx context.Context, invoiceID int64) ([]generate.InvoiceItem, error)
 	ListInvoiceItemsByInvoiceIDs(ctx context.Context, dollar_1 []int64) ([]generate.InvoiceItem, error)
+	ListActiveWebhookEndpointsByBusinessID(ctx context.Context, businessID int64) ([]generate.WebhookEndpoint, error)
+	CreateWebhookDelivery(ctx context.Context, arg generate.CreateWebhookDeliveryParams) (generate.WebhookDelivery, error)
 }
 
 // Transactor handles running transactional operations.
@@ -334,6 +337,19 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 			}
 			createdItems[idx] = item
 		}
+
+		// Queue INVOICE.CREATED webhook delivery atomically
+		pubInvID, _ := h.codec.Encode(publicid.PrefixInvoice, invoiceID)
+		payload, _ := webhook.BuildPayload(generate.WebhookEventTypeEnumINVOICECREATED, map[string]any{
+			"id":                 pubInvID,
+			"customer_id":        req.CustomerID,
+			"total_amount_cents": totalAmountCents,
+			"currency":           "USD",
+			"state":              string(initialState),
+			"due_date":           dueDate.Format("2006-01-02"),
+		})
+		_ = webhook.QueueDeliveries(c.Request.Context(), q, h.idGen, businessID, invoiceID, generate.WebhookEventTypeEnumINVOICECREATED, payload)
+
 		return nil
 	})
 
